@@ -245,6 +245,36 @@ df_raw = load_data(uploaded)
 
 # Auto-transform raw CSV block format
 df = preprocess_raw_block_format(df_raw)
+# ===========================================================
+# FORCE CLEAN ALL NUMERIC COLUMNS
+# ===========================================================
+numeric_cols = [
+    "total_aged",
+    "aged_amount",
+    "active_amount",
+    "percent_active",
+    "hrec_exceeded",
+    "cro",
+    "direct"
+]
+
+def clean_numeric(x):
+    if isinstance(x, str):
+        x = (
+            x.replace("$", "")
+             .replace(",", "")
+             .replace("%", "")
+             .strip()
+        )
+    return pd.to_numeric(x, errors="coerce")
+
+for col in numeric_cols:
+    if col in df.columns:
+        df[col] = df[col].apply(clean_numeric)
+
+# Fill missing numeric values with 0 for safety
+df[numeric_cols] = df[numeric_cols].fillna(0)
+
 
 # Validate after preprocess
 if not validate_data(df):
