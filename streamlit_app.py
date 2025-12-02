@@ -25,12 +25,9 @@ REQUIRED_COLUMNS = [
     "aged_amount",
     "active_amount",
     "percent_active",
-
-    # NEW fields
     "percent_hrec_exceeded",
     "percent_hrec_cro",
     "percent_hrec_direct",
-
     "hrec_exceeded",
     "cro",
     "direct"
@@ -141,7 +138,7 @@ def preprocess_raw_block_format(df):
         "hrec_exceeded",
         "cro",
         "direct"
-    ]
+]
 
     for col in numeric_cols:
         clean[col] = clean[col].apply(clean_num).fillna(0)
@@ -286,6 +283,9 @@ numeric_cols = [
     "aged_amount",
     "active_amount",
     "percent_active",
+    "percent_hrec_exceeded",
+    "percent_hrec_cro",
+    "percent_hrec_direct",
     "hrec_exceeded",
     "cro",
     "direct"
