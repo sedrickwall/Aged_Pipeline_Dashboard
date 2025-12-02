@@ -232,6 +232,9 @@ if uploaded_file is None:
     st.stop()
 
 df_raw = load_data(uploaded_file)
+
+# Automatically detect & convert your raw block format
+df_raw = preprocess_raw_block_format(df_raw)
 if df_raw is None:
     st.stop()
 
@@ -311,6 +314,95 @@ with col4:
     )
 
 st.markdown(f"**KPI Score for {selected_year}:** `{kpi_score}/100` — **{kpi_tier}**")
+
+def preprocess_raw_block_format(df):
+    """
+    Detects and transforms the 'vertical block' format Sedrick uses
+    into the long-format dataset required by the dashboard.
+    """
+
+    # If the dataframe already has required columns → skip
+    if all(c in df.columns for c in REQUIRED_COLUMNS):
+        return df  # no preprocessing needed
+
+    # Map columns → periods
+    period_map = {
+        df.columns[0]: "Start of Year",
+        df.columns[1]: "Mid-Year",
+        df.columns[2]: "Last Week"
+    }
+
+    # Expected vertical structure
+    metric_map = {
+        "Total Aged": "total_aged",
+        "Aged $": "aged_amount",
+        "% Active": "percent_active",
+        "% HREC Exceeded": "percent_hrec_exceeded",  # not needed but captured
+        "HREC Exceeded Count": "hrec_exceeded",
+        "CRO Count": "cro",
+        "Direct Count": "direct",
+        "% Direct": "percent_direct",
+        "% CRO": "percent_cro"
+    }
+
+    # STEP 1 — Clean labels column
+    labels = df.iloc[:, 0:1].rename(columns={df.columns[0]: "label"})
+    labels = labels.fillna(method="ffill")
+
+    # STEP 2 — Build clean long-format structure
+    final_rows = []
+
+    for col in df.columns:
+        period_name = period_map[col]
+
+        # Extract column as a series paired with labels
+        for i in range(len(df)):
+            label = str(labels.iloc[i, 0]).strip()
+            value = df[col].iloc[i]
+
+            # Only keep metrics we mapped
+            if label in metric_map:
+                metric_key = metric_map[label]
+
+                final_rows.append({
+                    "year": 2025,  # hardcode for now, or extract later
+                    "period": period_name,
+                    metric_key: value
+                })
+
+    # STEP 3 — Convert to DataFrame
+    clean_df = pd.DataFrame(final_rows)
+
+    # STEP 4 — Pivot data to wide format per period
+    clean_df = clean_df.pivot_table(
+        index=["year", "period"],
+        columns=clean_df.groupby(["year", "period"]).cumcount(),
+        aggfunc="first"
+    )
+
+    clean_df = clean_df.reset_index()
+
+    # STEP 5 — Flatten duplicate columns (cleanup)
+    clean_df = clean_df.loc[:, ~clean_df.columns.duplicated()]
+
+    # STEP 6 — Final required columns (fill missing with 0)
+    required_cols = [
+        "year", "period",
+        "total_aged",
+        "aged_amount",
+        "active_amount",        # not in raw file → set to 0
+        "percent_active",
+        "hrec_exceeded",
+        "cro",
+        "direct"
+    ]
+
+    for col in required_cols:
+        if col not in clean_df.columns:
+            clean_df[col] = 0
+
+    return clean_df[required_cols]
+
 
 # ===========================================================
 # DETAILED CHARTS FOR SELECTED YEAR
