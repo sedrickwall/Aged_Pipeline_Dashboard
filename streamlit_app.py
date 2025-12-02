@@ -39,52 +39,42 @@ REQUIRED_COLUMNS = [
 # ===========================================================
 def preprocess_raw_block_format(df):
     """
-    Converts Sedrick's 3-block aged pipeline export into standard long-format rows
-    including all percent-based HREC metrics.
+    Parses Sedrick's 3-block vertical CSV format correctly.
+    Each column contains LABEL, VALUE, LABEL, VALUE ...
     """
 
-    # If already clean → return
-    if all(col in df.columns for col in REQUIRED_COLUMNS):
-        return df
-
-    # Mapping of raw labels → final metric names
+    # Mapping raw labels → standardized metric names
     metric_map = {
         "Total Aged": "total_aged",
         "Total Aged Amount": "aged_amount",
         "Total Active": "active_amount",
         "% Active": "percent_active",
-
-        # HREC COUNT metrics
         "Total HREC Exceeded": "hrec_exceeded",
         "Total HREC Exceeded that are CRO": "cro",
         "Total of HREC Exceeded that are Direct": "direct",
-
-        # NEW requested percent metrics
         "% HREC Exceeded": "percent_hrec_exceeded",
         "% of HREC Exceeded that are CRO": "percent_hrec_cro",
         "% of HREC Exceeded that are Direct": "percent_hrec_direct",
     }
 
-    # Map block columns → periods
-    period_map = {
+    period_names = {
         df.columns[0]: "Start of Year",
         df.columns[1]: "Mid-Year",
         df.columns[2]: "Last Week"
     }
 
-    # Clean labels column
-    labels = df.iloc[:, 0].fillna("").astype(str).str.strip()
+    # Output rows
+    rows = []
 
-    output = []
-
-    # Loop through each period block
+    # Loop through each period column
     for col in df.columns:
-        period = period_map[col]
+        period = period_names[col]
+        values = df[col].fillna("").astype(str).str.strip().tolist()
 
-        # Initialize row with all metrics
-        row_data = {
+        row = {
             "year": 2025,
             "period": period,
+            # numeric fields initialized
             "total_aged": 0,
             "aged_amount": 0,
             "active_amount": 0,
@@ -97,36 +87,23 @@ def preprocess_raw_block_format(df):
             "direct": 0,
         }
 
-        # Loop through rows inside this block
-        for i in range(len(df)):
-            raw_label = labels.iloc[i]
-            raw_value = df[col].iloc[i]
+        # Extract label → value pairs
+        for i in range(len(values)):
+            label = values[i]
 
-            # Skip empty and invalid entries
-            if raw_value in ["", None, "#REF!"]:
-                continue
+            if label in metric_map:
+                if i + 1 < len(values):
+                    value = values[i + 1]
+                else:
+                    value = ""
 
-            # Only match mapped labels
-            if raw_label in metric_map:
-                mapped_field = metric_map[raw_label]
-                row_data[mapped_field] = raw_value
+                row[ metric_map[label] ] = value
 
-        output.append(row_data)
+        rows.append(row)
 
-    # Build DataFrame
-    clean = pd.DataFrame(output)
+    clean = pd.DataFrame(rows)
 
-    # Clean all numeric fields
-    def clean_num(x):
-        if isinstance(x, str):
-            x = (
-                x.replace("$", "")
-                 .replace(",", "")
-                 .replace("%", "")
-                 .strip()
-            )
-        return pd.to_numeric(x, errors="coerce")
-
+    # Convert numeric fields
     numeric_cols = [
         "total_aged",
         "aged_amount",
@@ -138,13 +115,17 @@ def preprocess_raw_block_format(df):
         "hrec_exceeded",
         "cro",
         "direct"
-]
+    ]
+
+    def clean_num(x):
+        if isinstance(x, str):
+            x = x.replace("$", "").replace(",", "").replace("%", "").strip()
+        return pd.to_numeric(x, errors="coerce")
 
     for col in numeric_cols:
         clean[col] = clean[col].apply(clean_num).fillna(0)
 
     return clean
-
 
 
 # ===========================================================
