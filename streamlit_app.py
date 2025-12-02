@@ -25,10 +25,17 @@ REQUIRED_COLUMNS = [
     "aged_amount",
     "active_amount",
     "percent_active",
+
+    # NEW fields
+    "percent_hrec_exceeded",
+    "percent_hrec_cro",
+    "percent_hrec_direct",
+
     "hrec_exceeded",
     "cro",
     "direct"
 ]
+
 
 # ===========================================================
 # 1. AUTO-PREPROCESSOR FOR RAW BLOCK CSV FORMAT
